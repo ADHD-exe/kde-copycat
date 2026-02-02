@@ -2,7 +2,8 @@
 
 A powerful terminal-based application for compiling Global KDE themes, configurations, and desktop settings by bundling you're current Global Theme Configuration.
 
-<img width="475" height="510" alt="Screenshot_20260202_061821" src="https://github.com/user-attachments/assets/75bfb632-2c3f-406f-b386-4f16fc4a38f6" />
+<img width="475" height="510" alt="Screenshot_20260202_061821" src="https://github.com/user-attachments/assets/75bfb632-2c3f-406f-b386-4f16fc4a38f6" /> ~ <img width="475" height="510" alt="copycat" src="https://github.com/user-attachments/assets/81cbc203-bf50-4248-88ca-4d61827d7b60" />
+
 
 ![KDE Logo](https://img.shields.io/badge/KDE-💙-blue?style=flat&logo=kde)
 ![Rust Version](https://img.shields.io/badge/rust-1.93.0+-orange?style=flat&logo=rust)
