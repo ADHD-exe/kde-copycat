@@ -1,6 +1,8 @@
-# KDE-Copycat - KDE Theme & Configuration Backup Tool
+# KDE-Copycat - Plasma KDE 6 Global Theme & Configuration Builder
 
-A powerful terminal-based application for backing up and copying KDE themes, configurations, and desktop settings.
+A powerful terminal-based application for compiling Global KDE themes, configurations, and desktop settings by bundling you're current Global Theme Configuration.
+
+<img width="950" height="1020" alt="Screenshot_20260202_061821" src="https://github.com/user-attachments/assets/75bfb632-2c3f-406f-b386-4f16fc4a38f6" />
 
 ![KDE Logo](https://img.shields.io/badge/KDE-💙-blue?style=flat&logo=kde)
 ![Rust Version](https://img.shields.io/badge/rust-1.93.0+-orange?style=flat&logo=rust)
