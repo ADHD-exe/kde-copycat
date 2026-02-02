@@ -1,0 +1,33 @@
+[package]
+name = "kde-copycat"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A powerful TUI application for backing up and copying KDE themes, configurations, and desktop settings"
+license = "MIT"
+repository = "https://github.com/yourusername/kde-copycat"
+homepage = "https://github.com/yourusername/kde-copycat"
+documentation = "https://github.com/yourusername/kde-copycat/blob/main/README.md"
+keywords = ["kde", "theme", "copy", "backup", "linux", "desktop", "plasma", "tui"]
+categories = ["command-line-utilities", "desktop-environment"]
+readme = "README.md"
+
+[dependencies]
+crossterm = "0.28"
+ratatui = "0.28"
+anyhow = "1.0"
+dirs = "5.0"
+fs_extra = "1.3"
+chrono = { version = "0.4", features = ["serde"] }
+atty = "0.2"
+
+[[bin]]
+name = "kde-copycat"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
