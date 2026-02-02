@@ -2,6 +2,8 @@
 
 Terminal app that bundles your current KDE Plasma 5/6 setup into a reusable backup/theme-style package. It detects what you’re using now (theme, effects, icons, etc.) and exports the relevant config files into a clean folder structure.
 
+<img width="475" height="510" alt="CopyCat" src="https://github.com/user-attachments/assets/101c5a27-e3f1-4ed9-adbc-e7bfd239599c" />
+
 ## What it backs up
 - Plasma global theme bits (look-and-feel, wallpapers, widgets/panels where applicable)
 - KWin settings (effects, decorations, rules)
