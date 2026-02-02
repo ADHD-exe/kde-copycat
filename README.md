@@ -21,3 +21,19 @@ Terminal app that bundles your current KDE Plasma 5/6 setup into a reusable back
 ### Cargo (recommended)
 ```bash
 cargo install kde-copycat
+````
+
+### Build from source
+
+```bash
+git clone <repository-url>
+cd kde-copycat
+cargo build --release
+sudo cp target/release/kde-copycat /usr/local/bin/
+```
+### Keys
+
+* Arrow keys: move
+* Space: toggle selection
+* Enter: continue
+* q / Esc: quit
