@@ -21,8 +21,3 @@ Terminal app that bundles your current KDE Plasma 5/6 setup into a reusable back
 ### Cargo (recommended)
 ```bash
 cargo install kde-copycat
-
-
-**Made with 💙 Rust for KDE desktop users**
-
-[GitHub Repository](https://github.com/yourusername/kde-copycat) | [Report Issues](https://github.com/yourusername/kde-copycat/issues) | [Request Features](https://github.com/yourusername/kde-copycat/discussions)# kde-copycat
