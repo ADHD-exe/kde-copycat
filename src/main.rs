@@ -69,12 +69,16 @@ pub struct App {
     pub mode: Mode,
     pub message: String,
     pub permission_issues: Vec<PermissionIssue>,
+    pub theme_directory: String,
+    pub directory_entries: Vec<String>,
+    pub directory_selected: usize,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Mode {
     Selecting,
     Naming,
+    DirectorySelection,
     Summary,
     PermissionCheck,
 }
@@ -110,11 +114,6 @@ impl App {
                 "Cursors",
                 vec!["~/.icons/", "~/.local/share/icons/", "/usr/share/icons/"],
                 "Mouse cursor themes",
-            ),
-            ThemeComponent::new(
-                "Icons",
-                vec!["~/.icons/", "~/.local/share/icons/"],
-                "Icon themes",
             ),
             ThemeComponent::new("Qt/KDE Styles", vec!["~/.config/"], "Qt5/Qt6 styles"),
             ThemeComponent::new(
@@ -155,16 +154,17 @@ impl App {
                 "SDDM login manager theme",
             ),
             ThemeComponent::new(
-                "SDDM Theme",
-                vec!["/usr/share/sddm/themes/"],
-                "SDDM login theme",
-            ),
-            ThemeComponent::new(
                 "Terminal Themes",
                 vec!["~/.config/alacritty/", "~/.config/kitty/"],
                 "Terminal themes",
             ),
         ];
+
+        let default_theme_dir = if let Some(home) = home_dir() {
+            home.join("CustomThemes").to_string_lossy().to_string()
+        } else {
+            "./CustomThemes".to_string()
+        };
 
         Self {
             components,
@@ -173,6 +173,9 @@ impl App {
             mode: Mode::Selecting,
             message: "Space to toggle, Enter to continue".to_string(),
             permission_issues: Vec::new(),
+            theme_directory: default_theme_dir,
+            directory_entries: Vec::new(),
+            directory_selected: 0,
         }
     }
 
@@ -219,6 +222,7 @@ fn draw_ui(f: &mut Frame, app: &App) {
     match app.mode {
         Mode::Selecting => draw_selection(f, app, chunks[1]),
         Mode::Naming => draw_naming(f, app, chunks[1]),
+        Mode::DirectorySelection => draw_directory_selection(f, app, chunks[1]),
         Mode::Summary => draw_summary(f, app, chunks[1]),
         Mode::PermissionCheck => draw_permission_check(f, app, chunks[1]),
     }
@@ -227,6 +231,10 @@ fn draw_ui(f: &mut Frame, app: &App) {
     let status_text = match app.mode {
         Mode::Selecting => app.message.clone(),
         Mode::Naming => format!("Name: {}_", app.theme_name),
+        Mode::DirectorySelection => format!(
+            "Path: {} | Enter: accept, Esc: cancel, Tab: create new",
+            app.theme_directory
+        ),
         Mode::Summary => "Enter to create, Esc to cancel".to_string(),
         Mode::PermissionCheck => {
             "1: Re-run with sudo, 2: Copy chmod commands, Esc: Cancel".to_string()
@@ -308,6 +316,58 @@ fn draw_naming(f: &mut Frame, app: &App, area: Rect) {
 
     let paragraph =
         Paragraph::new(text).block(Block::default().borders(Borders::ALL).title("Name Theme"));
+    f.render_widget(paragraph, area);
+}
+
+fn draw_directory_selection(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines = vec![
+        Line::from("Choose where to save your theme:"),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Current: ", Style::default().fg(Color::Yellow)),
+            Span::styled(&app.theme_directory, Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+    ];
+
+    if app.directory_entries.is_empty() {
+        lines.push(Line::from("Loading directory contents..."));
+    } else {
+        lines.push(Line::from("Directories:"));
+
+        for (i, entry) in app.directory_entries.iter().enumerate() {
+            let style = if i == app.directory_selected {
+                Style::default().add_modifier(Modifier::REVERSED | Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+
+            let prefix = if entry.ends_with('/') {
+                "📁 "
+            } else {
+                "📄 "
+            };
+
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(prefix, Style::default()),
+                Span::styled(entry, style),
+            ]));
+        }
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(
+            "↑↓: Navigate | Enter: Select | Tab: Create new directory",
+        ));
+    }
+
+    let paragraph = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Select Directory"),
+        )
+        .wrap(Wrap { trim: true });
     f.render_widget(paragraph, area);
 }
 
@@ -469,13 +529,65 @@ fn run_app_loop(
                                     if app.theme_name.trim().is_empty() {
                                         // Stay in naming mode
                                     } else {
-                                        app.mode = Mode::Summary;
+                                        update_directory_entries(app);
+                                        app.mode = Mode::DirectorySelection;
                                     }
                                 }
                                 KeyCode::Backspace => {
                                     app.theme_name.pop();
                                 }
                                 KeyCode::Char(c) => app.theme_name.push(c),
+                                _ => {}
+                            }
+                        }
+                        Mode::DirectorySelection => {
+                            match key.code {
+                                KeyCode::Esc => app.mode = Mode::Naming,
+                                KeyCode::Enter => {
+                                    let selected_entry = if !app.directory_entries.is_empty()
+                                        && app.directory_selected < app.directory_entries.len()
+                                    {
+                                        app.directory_entries.get(app.directory_selected).cloned()
+                                    } else {
+                                        None
+                                    };
+
+                                    if let Some(entry) = selected_entry {
+                                        if entry.ends_with('/') {
+                                            // Navigate into subdirectory
+                                            let new_path =
+                                                std::path::Path::new(&app.theme_directory)
+                                                    .join(entry.trim_end_matches('/'));
+                                            app.theme_directory =
+                                                new_path.to_string_lossy().to_string();
+                                            app.directory_selected = 0;
+                                            update_directory_entries(app);
+                                        }
+                                    } else {
+                                        // Accept current directory
+                                        app.mode = Mode::Summary;
+                                    }
+                                }
+                                KeyCode::Up => {
+                                    if !app.directory_entries.is_empty() {
+                                        app.directory_selected = if app.directory_selected == 0 {
+                                            app.directory_entries.len() - 1
+                                        } else {
+                                            app.directory_selected - 1
+                                        };
+                                    }
+                                }
+                                KeyCode::Down => {
+                                    if !app.directory_entries.is_empty() {
+                                        app.directory_selected = (app.directory_selected + 1)
+                                            % app.directory_entries.len();
+                                    }
+                                }
+                                KeyCode::Tab => {
+                                    // Create new directory functionality would go here
+                                    // For now, just accept current directory
+                                    app.mode = Mode::Summary;
+                                }
                                 _ => {}
                             }
                         }
@@ -543,48 +655,121 @@ fn run_app_loop(
     Ok(())
 }
 
-fn create_theme(app: &App) -> Result<()> {
-    let home = home_dir().context("No home directory")?;
-    let theme_dir = home.join("CustomThemes").join(&app.theme_name);
+fn update_directory_entries(app: &mut App) {
+    app.directory_entries.clear();
+    app.directory_selected = 0;
 
-    fs::create_dir_all(&theme_dir)?;
+    let path = std::path::Path::new(&app.theme_directory);
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if file_type.is_dir() && !name.starts_with('.') {
+                    app.directory_entries.push(name + "/");
+                }
+            }
+        }
+        app.directory_entries.sort();
+    }
+}
+
+fn create_theme(app: &App) -> Result<()> {
+    let theme_dir = std::path::Path::new(&app.theme_directory).join(&app.theme_name);
+
+    // Ensure we have absolute path for display
+    let display_theme_dir = if theme_dir.is_absolute() {
+        theme_dir.clone()
+    } else {
+        std::env::current_dir()
+            .context("Failed to get current directory")?
+            .join(&theme_dir)
+    };
+
+    fs::create_dir_all(&display_theme_dir)?;
+
+    let mut copied_files = Vec::new();
+    let mut skipped_files = Vec::new();
+
+    // Show user what we're doing
+    println!("\n🔍 Scanning for theme files...\n");
 
     for comp in app.checked_components() {
-        let component_dir = theme_dir.join(comp.name.replace(&[' ', '/'][..], "_"));
+        let component_dir = display_theme_dir.join(comp.name.replace(&[' ', '/'][..], "_"));
         fs::create_dir_all(&component_dir)?;
+
+        println!("📁 Processing: {}", comp.name);
 
         for path_str in &comp.source_paths {
             let path = expand_tilde(path_str);
+            println!("   Checking: {} -> {}", path_str, path.display());
+
             if path.exists() {
-                copy_recursive(&path, &component_dir).with_context(|| {
-                    format!("Failed to copy {} from {}", comp.name, path.display())
-                })?;
-                println!("Copied {} for {}", path.display(), comp.name);
+                if let Err(e) = copy_recursive(&path, &component_dir) {
+                    println!("   ❌ Failed to copy: {}", e);
+                    skipped_files.push(format!("{}: {} ({})", comp.name, path.display(), e));
+                } else {
+                    copied_files.push(format!("{}: {}", comp.name, path.display()));
+                    println!("   ✓ Successfully copied");
+                }
             } else {
-                println!("Path does not exist: {}", path.display());
+                println!("   ⚠ Path not found");
+                skipped_files.push(format!("{}: {} (not found)", comp.name, path.display()));
             }
         }
+        println!();
     }
 
     // Create theme metadata
-    let metadata_file = theme_dir.join("theme_info.txt");
+    let metadata_file = display_theme_dir.join("theme_info.txt");
     let metadata_content = format!(
-        "Theme Name: {}\nCreated: {}\nComponents:\n{}\n",
+        "Theme Name: {}\nCreated: {}\nSaved at: {}\nComponents:\n{}\n\nSuccessfully copied files:\n{}\n\nSkipped files:\n{}\n\nRuntime info:\n- USER: {}\n- HOME: {}\n- SUDO_USER: {}\n",
         app.theme_name,
         chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+        display_theme_dir.display(),
         app.checked_components()
             .iter()
             .map(|c| format!("- {}: {}", c.name, c.description))
             .collect::<Vec<_>>()
-            .join("\n")
+            .join("\n"),
+        if copied_files.is_empty() {
+            "No files were copied".to_string()
+        } else {
+            copied_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n")
+        },
+        if skipped_files.is_empty() {
+            "No files were skipped".to_string()
+        } else {
+            skipped_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n")
+        },
+        std::env::var("USER").unwrap_or_else(|_| "unknown".to_string()),
+        std::env::var("HOME").unwrap_or_else(|_| "unknown".to_string()),
+        std::env::var("SUDO_USER").unwrap_or_else(|_| "not set".to_string()),
     );
     fs::write(metadata_file, metadata_content)?;
 
+    // Clear screen and show success message
+    println!("\n{}\n", "=".repeat(60));
+    println!("🎉 THEME CREATION COMPLETE! 🎉");
+    println!("{}", "=".repeat(60));
+    println!("Theme Name: {}", app.theme_name);
+    println!("Saved at: {}", display_theme_dir.display());
+    println!("Components included: {}", app.checked_components().len());
+    println!("Files successfully copied: {}", copied_files.len());
+    if !skipped_files.is_empty() {
+        println!("Files skipped/not found: {}", skipped_files.len());
+    }
+    println!("{}", "=".repeat(60));
     println!(
-        "Theme '{}' created at {}",
-        app.theme_name,
-        theme_dir.display()
+        "You can find your theme at: {}",
+        display_theme_dir.display()
     );
+    println!("A theme_info.txt file has been created with complete details.");
+    if copied_files.is_empty() {
+        println!("\n⚠️  Warning: No files were copied. Check the paths and permissions.");
+        println!("The app might be looking for files in the wrong home directory.");
+    }
+    println!("{}", "=".repeat(60));
+
     Ok(())
 }
 
@@ -1218,9 +1403,69 @@ impl PathExt for Path {
 
 fn expand_tilde(path: &str) -> std::path::PathBuf {
     if path.starts_with("~/") {
-        if let Some(home) = home_dir() {
-            return home.join(&path[2..]);
+        // Get the real user's home directory
+        let home = get_user_home_dir();
+        return home.join(&path[2..]);
+    } else if path == "~" {
+        let home = get_user_home_dir();
+        return home;
+    }
+
+    // Handle relative paths by making them absolute to current directory
+    let path_buf = std::path::PathBuf::from(path);
+    if path_buf.is_relative() {
+        if let Ok(current_dir) = std::env::current_dir() {
+            return current_dir.join(path_buf);
         }
     }
-    std::path::PathBuf::from(path)
+
+    path_buf
+}
+
+fn get_user_home_dir() -> std::path::PathBuf {
+    // CRITICAL: Always prioritize SUDO_USER to get original user when running with sudo
+    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+        let home = std::path::PathBuf::from("/home").join(&sudo_user);
+        if home.exists() {
+            return home;
+        }
+    }
+
+    // If not sudo, try normal environment
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = std::path::PathBuf::from(&home);
+        // Don't use root's home directory
+        if !home_path.ends_with("/root") && home_path.exists() {
+            return home_path;
+        }
+    }
+
+    // Try to get the current user and construct their home directory
+    if let Ok(username) = std::env::var("USER") {
+        if username != "root" {
+            let home = std::path::PathBuf::from("/home").join(&username);
+            if home.exists() {
+                return home;
+            }
+        }
+    }
+
+    // Last resort: find first non-root user directory in /home
+    if let Ok(entries) = std::fs::read_dir("/home") {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_dir() {
+                    let path = entry.path();
+                    if let Some(name) = path.file_name() {
+                        if name != "root" {
+                            return path;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Ultimate fallback: current directory
+    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
 }
